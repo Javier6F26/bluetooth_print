@@ -266,26 +266,26 @@
         NSNumber *ret = @0;
         switch (state) {
             case CONNECT_STATE_CONNECTING:
-                NSLog(@"status -> %@", @"连接状态：连接中....");
+                NSLog(@"status -> %@", @"Connection Status: Connecting....");
                 ret = @0;
                 self.stateID = 0;
                 break;
             case CONNECT_STATE_CONNECTED:
-                NSLog(@"status -> %@", @"连接状态：连接成功");
+                NSLog(@"status -> %@", @"Connection Status: Connection successful");
                 ret = @1;
                 self.stateID = 1;
                 break;
             case CONNECT_STATE_FAILT:
-                NSLog(@"status -> %@", @"连接状态：连接失败");
+                NSLog(@"status -> %@", @"Connection Status: Connection failed");
                 ret = @0;
                 break;
             case CONNECT_STATE_DISCONNECT:
-                NSLog(@"status -> %@", @"连接状态：断开连接");
+                NSLog(@"status -> %@", @"Connection Status: Disconnected");
                 ret = @0;
                 self.stateID = -1;
                 break;
             default:
-                NSLog(@"status -> %@", @"连接状态：连接超时");
+                NSLog(@"status -> %@", @"Connection Status: The connection timed out");
                 ret = @0;
                 self.stateID = -1;
                 break;
