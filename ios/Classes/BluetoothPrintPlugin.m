@@ -7,6 +7,7 @@
 @property(nonatomic, retain) NSObject<FlutterPluginRegistrar> *registrar;
 @property(nonatomic, retain) FlutterMethodChannel *channel;
 @property(nonatomic, retain) BluetoothPrintStreamHandler *stateStreamHandler;
+@property(nonatomic, assign) int stateID;
 @property(nonatomic) NSMutableDictionary *scannedPeripherals;
 @end
 
@@ -20,7 +21,7 @@
 
   instance.channel = channel;
   instance.scannedPeripherals = [NSMutableDictionary new];
-    
+
   // STATE
   BluetoothPrintStreamHandler* stateStreamHandler = [[BluetoothPrintStreamHandler alloc] init];
   [stateChannel setStreamHandler:stateStreamHandler];
@@ -31,21 +32,23 @@
 
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
   NSLog(@"call method -> %@", call.method);
-    
+
   if ([@"state" isEqualToString:call.method]) {
-    result(nil);
+    result([NSNumber numberWithInt:self.stateID]);
   } else if([@"isAvailable" isEqualToString:call.method]) {
-    
+
     result(@(YES));
   } else if([@"isConnected" isEqualToString:call.method]) {
-    
-    result(@(NO));
+
+    bool isConnected = self.stateID == 1;
+
+    result(@(isConnected));
   } else if([@"isOn" isEqualToString:call.method]) {
     result(@(YES));
   }else if([@"startScan" isEqualToString:call.method]) {
       NSLog(@"getDevices method -> %@", call.method);
       [self.scannedPeripherals removeAllObjects];
-      
+
       if (Manager.bleConnecter == nil) {
           [Manager didUpdateState:^(NSInteger state) {
               switch (state) {
@@ -70,7 +73,7 @@
       } else {
           [self startScan];
       }
-      
+
     result(nil);
   } else if([@"stopScan" isEqualToString:call.method]) {
     [Manager stopScan];
@@ -80,12 +83,12 @@
     @try {
       NSLog(@"connect device begin -> %@", [device objectForKey:@"name"]);
       CBPeripheral *peripheral = [_scannedPeripherals objectForKey:[device objectForKey:@"address"]];
-        
+
       self.state = ^(ConnectState state) {
         [self updateConnectState:state];
       };
       [Manager connectPeripheral:peripheral options:nil timeout:2 connectBlack: self.state];
-      
+
       result(nil);
     } @catch(FlutterError *e) {
       result(e);
@@ -99,7 +102,7 @@
     }
   } else if([@"print" isEqualToString:call.method]) {
      @try {
-       
+
        result(nil);
      } @catch(FlutterError *e) {
        result(e);
@@ -122,7 +125,7 @@
      }
   }else if([@"printTest" isEqualToString:call.method]) {
      @try {
-       
+
        result(nil);
      } @catch(FlutterError *e) {
        result(e);
@@ -133,11 +136,11 @@
 -(NSData *)mapToTscCommand:(NSDictionary *) args {
     NSDictionary *config = [args objectForKey:@"config"];
     NSMutableArray *list = [args objectForKey:@"data"];
-    
+
     NSNumber *width = ![config objectForKey:@"width"]?@"48" : [config objectForKey:@"width"];
     NSNumber *height = ![config objectForKey:@"height"]?@"80" : [config objectForKey:@"height"];
     NSNumber *gap = ![config objectForKey:@"gap"]?@"2" : [config objectForKey:@"gap"];
-    
+
     TscCommand *command = [[TscCommand alloc]init];
     // 设置标签尺寸宽高，按照实际尺寸设置 单位mm
     [command addSize:[width intValue] :[height intValue]];
@@ -151,14 +154,14 @@
     [command addQueryPrinterStatus:ON];
     // 清除打印缓冲区
     [command addCls];
-    
+
     for(NSDictionary *m in list){
-        
+
         NSString *type = [m objectForKey:@"type"];
         NSString *content = [m objectForKey:@"content"];
         NSNumber *x = ![m objectForKey:@"x"]?@0 : [m objectForKey:@"x"];
         NSNumber *y = ![m objectForKey:@"y"]?@0 : [m objectForKey:@"y"];
-        
+
         if([@"text" isEqualToString:type]){
             [command addTextwithX:[x intValue] withY:[y intValue] withFont:@"TSS24.BF2" withRotation:0 withXscal:1 withYscal:1 withText:content];
         }else if([@"barcode" isEqualToString:type]){
@@ -170,9 +173,9 @@
             UIImage *image = [UIImage imageWithData:decodeData];
             [command addBitmapwithX:[x intValue] withY:[y intValue] withMode:0 withWidth:300 withImage:image];
         }
-       
+
     }
-    
+
     [command addPrint:1 :1];
     return [command getCommand];
 }
@@ -180,13 +183,13 @@
 -(NSData *)mapToEscCommand:(NSDictionary *) args {
     NSDictionary *config = [args objectForKey:@"config"];
     NSMutableArray *list = [args objectForKey:@"data"];
-    
+
     EscCommand *command = [[EscCommand alloc]init];
     [command addInitializePrinter];
     [command addPrintAndFeedLines:3];
 
     for(NSDictionary *m in list){
-        
+
         NSString *type = [m objectForKey:@"type"];
         NSString *content = [m objectForKey:@"content"];
         NSNumber *align = ![m objectForKey:@"align"]?@0 : [m objectForKey:@"align"];
@@ -196,12 +199,22 @@
         NSNumber *height = ![m objectForKey:@"height"]?@0 : [m objectForKey:@"height"];
         NSNumber *underline = ![m objectForKey:@"underline"]?@0 : [m objectForKey:@"underline"];
         NSNumber *linefeed = ![m objectForKey:@"linefeed"]?@0 : [m objectForKey:@"linefeed"];
-        
+
         //内容居左（默认居左）
         [command addSetJustification:[align intValue]];
-        
+
         if([@"text" isEqualToString:type]){
-            [command addPrintMode: [weight intValue] ==0?0:0|8|16|32];
+                       Byte mode = PrintModeEnumDefault;
+                       if ([weight intValue] == 1) mode = mode | PrintModeEnumBold;
+                       if ([underline intValue] == 1) mode = mode | PrintModeEnumUnderline;
+                       [command addPrintMode: mode];
+
+                       Byte size = CharacterSizeEnumDefault;
+                       if ([height intValue] == 1) size = size | CharacterSizeEnumDoubleHeight;
+                       if ([width intValue] == 1) size = size | CharacterSizeEnumDoubleWidth;
+                       [command addSetCharcterSize: size];
+            [command addPrintMode: PrintModeEnumDefault];
+            [command addSetCharcterSize: CharacterSizeEnumDefault];
             [command addText:content];
             [command addPrintMode: 0];
         }else if([@"barcode" isEqualToString:type]){
@@ -210,22 +223,25 @@
             [command addSetBarcodeHRPosition:2];
             [command addCODE128:'B' : content];
         }else if([@"qrcode" isEqualToString:type]){
-            //二维码
-            [command addQRCodeSizewithpL:0 withpH:0 withcn:0 withyfn:0 withn:[size intValue]];
-            [command addQRCodeSavewithpL:0x0b withpH:0 withcn:0x31 withyfn:0x50 withm:0x30 withData:[content dataUsingEncoding:NSUTF8StringEncoding]];
-            [command addQRCodePrintwithpL:0 withpH:0 withcn:0 withyfn:0 withm:0];
+             //  This code snippet has been copied from https://stackoverflow.com/q/34608340/1993514
+              int store_len = (int )content.length + 3;
+              int pl = (store_len % 256);
+              [command addQRCodeSizewithpL:0  withpH:0    withcn:49 withyfn:67 withn:[size intValue]];
+              [command addQRCodeLevelwithpL:0 withpH:0    withcn:49 withyfn:69 withn:[size intValue]];
+              [command addQRCodeSavewithpL:pl withpH:0    withcn:49 withyfn:80 withm:48 withData:[content dataUsingEncoding:NSASCIIStringEncoding]];
+              [command addQRCodePrintwithpL:3 withpH:pl+3 withcn:49 withyfn:81 withm:48];
         }else if([@"image" isEqualToString:type]){
             NSData *decodeData = [[NSData alloc] initWithBase64EncodedString:content options:0];
             UIImage *image = [UIImage imageWithData:decodeData];
             [command addOriginrastBitImage:image width:576];
         }
-        
+
         if([linefeed isEqualToNumber:@1]){
             [command addPrintAndLineFeed];
         }
-       
+
     }
-    
+
     [command addPrintAndFeedLines:4];
     return [command getCommand];
 }
@@ -234,15 +250,15 @@
 -(void)startScan {
     [Manager scanForPeripheralsWithServices:nil options:nil discover:^(CBPeripheral * _Nullable peripheral, NSDictionary<NSString *,id> * _Nullable advertisementData, NSNumber * _Nullable RSSI) {
         if (peripheral.name != nil) {
-            
+
             NSLog(@"find device -> %@", peripheral.name);
             [self.scannedPeripherals setObject:peripheral forKey:[[peripheral identifier] UUIDString]];
-            
+
             NSDictionary *device = [NSDictionary dictionaryWithObjectsAndKeys:peripheral.identifier.UUIDString,@"address",peripheral.name,@"name",nil,@"type",nil];
             [_channel invokeMethod:@"ScanResult" arguments:device];
         }
     }];
-    
+
 }
 
 -(void)updateConnectState:(ConnectState)state {
@@ -252,10 +268,12 @@
             case CONNECT_STATE_CONNECTING:
                 NSLog(@"status -> %@", @"连接状态：连接中....");
                 ret = @0;
+                self.stateID = 0;
                 break;
             case CONNECT_STATE_CONNECTED:
                 NSLog(@"status -> %@", @"连接状态：连接成功");
                 ret = @1;
+                self.stateID = 1;
                 break;
             case CONNECT_STATE_FAILT:
                 NSLog(@"status -> %@", @"连接状态：连接失败");
@@ -264,13 +282,15 @@
             case CONNECT_STATE_DISCONNECT:
                 NSLog(@"status -> %@", @"连接状态：断开连接");
                 ret = @0;
+                self.stateID = -1;
                 break;
             default:
                 NSLog(@"status -> %@", @"连接状态：连接超时");
                 ret = @0;
+                self.stateID = -1;
                 break;
         }
-        
+
          NSDictionary *dict = [NSDictionary dictionaryWithObjectsAndKeys:ret,@"id",nil];
         if(_stateStreamHandler.sink != nil) {
           self.stateStreamHandler.sink([dict objectForKey:@"id"]);
