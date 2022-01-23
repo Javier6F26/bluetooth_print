@@ -186,7 +186,7 @@
 
     EscCommand *command = [[EscCommand alloc]init];
     [command addInitializePrinter];
-    [command addPrintAndFeedLines:3];
+ //   [command addPrintAndFeedLines:3];
 
     for(NSDictionary *m in list){
 
@@ -242,7 +242,7 @@
 
     }
 
-    [command addPrintAndFeedLines:4];
+//    [command addPrintAndFeedLines:4];
     return [command getCommand];
 }
 
@@ -254,7 +254,7 @@
             NSLog(@"find device -> %@", peripheral.name);
             [self.scannedPeripherals setObject:peripheral forKey:[[peripheral identifier] UUIDString]];
 
-            NSDictionary *device = [NSDictionary dictionaryWithObjectsAndKeys:peripheral.identifier.UUIDString,@"address",peripheral.identifier.UUIDString,@"name",peripheral.name,@"type",nil];
+            NSDictionary *device = [NSDictionary dictionaryWithObjectsAndKeys:peripheral.identifier.UUIDString,@"address",peripheral.name,@"name",nil,@"type",nil];
             [_channel invokeMethod:@"ScanResult" arguments:device];
         }
     }];
