@@ -254,7 +254,7 @@
             NSLog(@"find device -> %@", peripheral.name);
             [self.scannedPeripherals setObject:peripheral forKey:[[peripheral identifier] UUIDString]];
 
-            NSDictionary *device = [NSDictionary dictionaryWithObjectsAndKeys:peripheral.identifier.UUIDString,@"address",peripheral.address,@"name",peripheral.name,@"type",peripheral.type];
+            NSDictionary *device = [NSDictionary dictionaryWithObjectsAndKeys:peripheral.identifier.UUIDString,@"address",peripheral.identifier.UUIDString,@"name",peripheral.name,@"type",nil];
             [_channel invokeMethod:@"ScanResult" arguments:device];
         }
     }];
